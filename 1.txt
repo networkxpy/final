@@ -1,0 +1,77 @@
+import networkx as nx
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Generate a network (Erdős-Rényi or Scale-Free)
+def generate_network(network_type='ER', N=100, p=0.05, m=3):
+    if network_type == 'ER':  # Erdős-Rényi
+        return nx.erdos_renyi_graph(N, p)
+    elif network_type == 'BA':  # Barabási-Albert
+        return nx.barabasi_albert_graph(N, m)
+    else:
+        raise ValueError("Invalid network type. Choose 'ER' or 'BA'.")
+
+# Attack the network by removing a fraction of nodes
+def attack_network(G, attack_type='random', fraction_remove=0.1):
+    G_copy = G.copy()
+    N = len(G_copy)
+    num_remove = int(fraction_remove * N)
+
+    if attack_type == 'random':
+        nodes_to_remove = np.random.choice(G_copy.nodes(), size=num_remove, replace=False)
+    elif attack_type == 'targeted':
+        nodes_to_remove = sorted(G_copy.degree(), key=lambda x: x[1], reverse=True)[:num_remove]
+        nodes_to_remove = [node for node, _ in nodes_to_remove]
+    else:
+        raise ValueError("Invalid attack type. Choose 'random' or 'targeted'.")
+
+    G_copy.remove_nodes_from(nodes_to_remove)
+
+    return G_copy
+
+# Calculate size of the largest connected component
+def largest_component_size(G):
+    if len(G) == 0:
+        return 0
+    largest_cc = max(nx.connected_components(G), key=len)
+    return len(largest_cc)
+
+# Simulate and visualize robustness analysis
+def robustness_analysis(network_type='ER', attack_type='random', N=100, p=0.05, m=3):
+    G = generate_network(network_type, N, p, m)
+    
+    # Fractions of nodes to remove
+    fractions_removed = np.linspace(0, 1, 20)
+    largest_components = []
+
+    # Visualize the original network
+    visualize_network(G, f"Original {network_type} Network")
+
+    for fraction in fractions_removed:
+        G_attacked = attack_network(G, attack_type, fraction)
+        largest_cc_size = largest_component_size(G_attacked)
+        largest_components.append(largest_cc_size)
+        
+        # Visualize the network after 20% of nodes have been removed
+        if fraction == 0.2:
+            visualize_network(G_attacked, f"Network after 20% {attack_type.capitalize()} Attack")
+    
+    # Plot the robustness curve
+    plt.plot(fractions_removed, largest_components, label=f'{attack_type.capitalize()} Attack')
+    plt.xlabel('Fraction of nodes removed')
+    plt.ylabel('Size of largest connected component')
+    plt.title(f'Robustness of {network_type} Network under {attack_type.capitalize()} Attack')
+    plt.legend()
+    plt.show()
+
+# Visualize a network
+def visualize_network(G, title):
+    plt.figure(figsize=(8, 8))
+    pos = nx.spring_layout(G)
+    nx.draw(G, pos, node_color='skyblue', node_size=50, edge_color='gray', with_labels=False)
+    plt.title(title)
+    plt.show()
+
+# Example usage
+robustness_analysis(network_type='BA', attack_type='random', N=500, m=3)
+robustness_analysis(network_type='BA', attack_type='targeted', N=500, m=3)
